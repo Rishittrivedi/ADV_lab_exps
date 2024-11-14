@@ -1,0 +1,140 @@
+<!-- https://www.kaggle.com/datasets/parulpandey/palmer-archipelago-antarctica-penguin-data -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Penguin Dataset Visualizations</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .chart { display: inline-block; margin: 20px; }
+        .axis-label { font-size: 12px; font-weight: bold; }
+        .title { font-size: 14px; font-weight: bold; text-align: center; margin: 10px; }
+        .legend { font-size: 12px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Penguin Dataset Visualizations</h1>
+    
+    <div id="species-bar" class="chart"></div>
+    <div id="sex-pie" class="chart"></div>
+    <div id="bodymass-histogram" class="chart"></div>
+    <div id="culmen-scatter" class="chart"></div>
+    <div id="flipper-box" class="chart"></div>
+    <div id="delta-bubble" class="chart"></div>
+
+    <script>
+        d3.csv("penguins.csv").then(data => {
+            // Parse numeric columns
+            data.forEach(d => {
+                d["Culmen Length (mm)"] = +d["Culmen Length (mm)"];
+                d["Culmen Depth (mm)"] = +d["Culmen Depth (mm)"];
+                d["Flipper Length (mm)"] = +d["Flipper Length (mm)"];
+                d["Body Mass (g)"] = +d["Body Mass (g)"];
+                d["Delta 15 N"] = +d["Delta 15 N"];
+                d["Delta 13 C"] = +d["Delta 13 C"];
+            });
+
+            // Bar Chart for Species Distribution
+            const speciesCount = d3.rollup(data, v => v.length, d => d.Species);
+            const speciesBar = d3.select("#species-bar").append("svg").attr("width", 350).attr("height", 250);
+            speciesBar.append("text").attr("x", 175).attr("y", 20).attr("class", "title").text("Penguin Species Distribution");
+            const xSpecies = d3.scaleBand().domain([...speciesCount.keys()]).range([0, 300]).padding(0.1);
+            const ySpecies = d3.scaleLinear().domain([0, d3.max(speciesCount.values())]).range([200, 30]);
+            speciesBar.append("g").attr("transform", "translate(30,200)").call(d3.axisBottom(xSpecies));
+            speciesBar.append("g").attr("transform", "translate(30,0)").call(d3.axisLeft(ySpecies));
+            speciesBar.selectAll("rect")
+                .data(speciesCount)
+                .enter().append("rect")
+                .attr("x", d => xSpecies(d[0]) + 30)
+                .attr("y", d => ySpecies(d[1]))
+                .attr("width", xSpecies.bandwidth())
+                .attr("height", d => 200 - ySpecies(d[1]))
+                .attr("fill", "steelblue");
+
+            // Pie Chart for Sex Distribution
+            const sexCount = d3.rollup(data, v => v.length, d => d.Sex);
+            const radius = 100;
+            const sexPie = d3.select("#sex-pie").append("svg").attr("width", 250).attr("height", 250);
+            sexPie.append("text").attr("x", 125).attr("y", 20).attr("class", "title").text("Sex Distribution");
+            const pieSex = d3.pie().value(d => d[1])(Array.from(sexCount));
+            const arcSex = d3.arc().innerRadius(0).outerRadius(radius);
+            const colors = d3.scaleOrdinal().domain(sexCount.keys()).range(["#FF8C00", "#4169E1"]);
+            const gPie = sexPie.append("g").attr("transform", "translate(125,125)");
+            gPie.selectAll("path")
+                .data(pieSex)
+                .enter().append("path")
+                .attr("d", arcSex)
+                .attr("fill", d => colors(d.data[0]));
+            // Legend for Pie Chart
+            const legendSex = sexPie.append("g").attr("class", "legend").attr("transform", "translate(20, 220)");
+            legendSex.selectAll("rect")
+                .data(sexCount.keys())
+                .enter().append("rect")
+                .attr("x", (d, i) => i * 70)
+                .attr("width", 15).attr("height", 15)
+                .attr("fill", d => colors(d));
+            legendSex.selectAll("text")
+                .data(sexCount.keys())
+                .enter().append("text")
+                .attr("x", (d, i) => i * 70 + 20)
+                .attr("y", 12)
+                .text(d => d);
+
+            // Histogram for Body Mass Distribution
+            const bodyMassData = data.map(d => d["Body Mass (g)"]).filter(d => !isNaN(d));
+            const histogramBodyMass = d3.histogram().thresholds(10)(bodyMassData);
+            const xBodyMass = d3.scaleLinear().domain(d3.extent(bodyMassData)).range([30, 330]);
+            const yBodyMass = d3.scaleLinear().domain([0, d3.max(histogramBodyMass, d => d.length)]).range([200, 30]);
+            const bodyMassHist = d3.select("#bodymass-histogram").append("svg").attr("width", 350).attr("height", 250);
+            bodyMassHist.append("text").attr("x", 175).attr("y", 20).attr("class", "title").text("Body Mass Distribution");
+            bodyMassHist.append("g").attr("transform", "translate(0,200)").call(d3.axisBottom(xBodyMass));
+            bodyMassHist.append("g").attr("transform", "translate(30,0)").call(d3.axisLeft(yBodyMass));
+            bodyMassHist.selectAll("rect")
+                .data(histogramBodyMass)
+                .enter().append("rect")
+                .attr("x", d => xBodyMass(d.x0))
+                .attr("y", d => yBodyMass(d.length))
+                .attr("width", d => xBodyMass(d.x1) - xBodyMass(d.x0))
+                .attr("height", d => 200 - yBodyMass(d.length))
+                .attr("fill", "teal");
+
+            // Scatter Plot for Culmen Length vs Culmen Depth
+            const scatterCulmen = d3.select("#culmen-scatter").append("svg").attr("width", 350).attr("height", 250);
+            scatterCulmen.append("text").attr("x", 175).attr("y", 20).attr("class", "title").text("Culmen Length vs Culmen Depth");
+            const xCulmen = d3.scaleLinear().domain(d3.extent(data, d => d["Culmen Length (mm)"])).range([30, 330]);
+            const yCulmen = d3.scaleLinear().domain(d3.extent(data, d => d["Culmen Depth (mm)"])).range([200, 30]);
+            scatterCulmen.append("g").attr("transform", "translate(0,200)").call(d3.axisBottom(xCulmen));
+            scatterCulmen.append("g").attr("transform", "translate(30,0)").call(d3.axisLeft(yCulmen));
+            scatterCulmen.selectAll("circle")
+                .data(data)
+                .enter().append("circle")
+                .attr("cx", d => xCulmen(d["Culmen Length (mm)"]))
+                .attr("cy", d => yCulmen(d["Culmen Depth (mm)"]))
+                .attr("r", 3)
+                .attr("fill", "purple");
+
+            // Box and Whisker Plot for Flipper Length by Sex
+            const groupedFlipper = d3.group(data.filter(d => d.Sex), d => d.Sex);
+            const flipperBox = d3.select("#flipper-box").append("svg").attr("width", 350).attr("height", 250);
+            flipperBox.append("text").attr("x", 175).attr("y", 20).attr("class", "title").text("Flipper Length by Sex");
+            const xFlipper = d3.scaleBand().domain(["MALE", "FEMALE"]).range([30, 330]).padding(0.5);
+            const yFlipper = d3.scaleLinear().domain(d3.extent(data, d => d["Flipper Length (mm)"])).range([200, 30]);
+            flipperBox.append("g").attr("transform", "translate(0,200)").call(d3.axisBottom(xFlipper));
+            flipperBox.append("g").attr("transform", "translate(30,0)").call(d3.axisLeft(yFlipper));
+            groupedFlipper.forEach((v, k) => {
+                const q1 = d3.quantile(v.map(d => d["Flipper Length (mm)"]).sort(d3.ascending), 0.25);
+                const q3 = d3.quantile(v.map(d => d["Flipper Length (mm)"]).sort(d3.ascending), 0.75);
+                const iqr = q3 - q1;
+                const median = d3.median(v, d => d["Flipper Length (mm)"]);
+                const min = Math.max(q1 - 1.5 * iqr, d3.min(v, d => d["Flipper Length (mm)"]));
+                const max = Math.min(q3 + 1.5 * iqr, d3.max(v, d => d["Flipper Length (mm)"]));
+                const x = xFlipper(k) + xFlipper.bandwidth() / 2;
+                flipperBox.append("line").attr("x1", x).attr("x2", x).attr("y1", yFlipper(min)).attr("y2", yFlipper(max)).attr("stroke", "black");
+                flipperBox.append("rect").attr("x", x - 10).attr("y", yFlipper(q3)).attr("height", yFlipper(q1) - yFlipper(q3)).attr("width", 20).attr("fill", "orange");
+                flipperBox.append("line").attr("x1", x - 10).attr("x2", x + 10).attr("y1", yFlipper(median)).attr("y2", yFlipper(median)).attr("stroke", "black");
+            });
+        });
+    </script>
+</body>
+</html>

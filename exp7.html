@@ -1,0 +1,195 @@
+<!-- kaggle link - https://www.kaggle.com/code/janiobachmann/bank-marketing-campaign-opening-a-term-deposit/input -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D3.js Visualizations</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+</head>
+<body>
+    <h2>Job Distribution (Bar Chart)</h2>
+    <div id="barChart"></div>
+
+    <h2>Marital Status Distribution (Pie Chart)</h2>
+    <div id="pieChart"></div>
+
+    <h2>Monthly Calls Timeline (Line Chart)</h2>
+    <div id="lineChart"></div>
+
+    <h2>Age Distribution (Histogram)</h2>
+    <div id="histogramChart"></div>
+
+    <h2>Balance vs. Age (Scatter Plot)</h2>
+    <div id="scatterChart"></div>
+
+    <h2>Balance by Marital Status (Box and Whisker Plot)</h2>
+    <div id="boxPlotChart"></div>
+
+    <script>
+        d3.csv("bank.csv").then(function(data) {
+            // Parse numeric data
+            data.forEach(d => {
+                d.age = +d.age;
+                d.balance = +d.balance;
+                d.duration = +d.duration;
+            });
+
+            // 1. Bar Chart for Job Distribution
+            const jobCounts = d3.rollup(data, v => v.length, d => d.job);
+            const jobs = Array.from(jobCounts.keys());
+            const jobValues = Array.from(jobCounts.values());
+
+            const width = 400, height = 300, margin = 40;
+            const svgBar = d3.select("#barChart")
+                .append("svg")
+                .attr("width", width + 2 * margin)
+                .attr("height", height + 2 * margin)
+                .append("g")
+                .attr("transform", `translate(${margin}, ${margin})`);
+
+            const xBar = d3.scaleBand().domain(jobs).range([0, width]).padding(0.2);
+            const yBar = d3.scaleLinear().domain([0, d3.max(jobValues)]).range([height, 0]);
+
+            svgBar.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xBar));
+            svgBar.append("g").call(d3.axisLeft(yBar));
+
+            svgBar.selectAll("rect")
+                .data(Array.from(jobCounts))
+                .enter()
+                .append("rect")
+                .attr("x", d => xBar(d[0]))
+                .attr("y", d => yBar(d[1]))
+                .attr("width", xBar.bandwidth())
+                .attr("height", d => height - yBar(d[1]))
+                .attr("fill", "steelblue");
+
+            // 2. Pie Chart for Marital Status Distribution
+            const maritalCounts = d3.rollup(data, v => v.length, d => d.marital);
+            const radius = Math.min(width, height) / 2;
+
+            const svgPie = d3.select("#pieChart")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .append("g")
+                .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+            const pie = d3.pie().value(d => d[1]);
+            const arc = d3.arc().innerRadius(0).outerRadius(radius);
+
+            svgPie.selectAll("path")
+                .data(pie(Array.from(maritalCounts)))
+                .enter()
+                .append("path")
+                .attr("d", arc)
+                .attr("fill", (d, i) => d3.schemeCategory10[i]);
+
+            // 3. Line Chart for Monthly Calls Timeline
+            const monthsData = d3.rollup(data, v => v.length, d => d.month);
+            const months = Array.from(monthsData.keys()).sort();
+            const calls = months.map(month => monthsData.get(month));
+
+            const svgLine = d3.select("#lineChart")
+                .append("svg")
+                .attr("width", width + 2 * margin)
+                .attr("height", height + 2 * margin)
+                .append("g")
+                .attr("transform", `translate(${margin}, ${margin})`);
+
+            const xLine = d3.scalePoint().domain(months).range([0, width]);
+            const yLine = d3.scaleLinear().domain([0, d3.max(calls)]).range([height, 0]);
+
+            svgLine.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xLine));
+            svgLine.append("g").call(d3.axisLeft(yLine));
+
+            const line = d3.line().x((d, i) => xLine(months[i])).y(d => yLine(d));
+
+            svgLine.append("path").datum(calls).attr("fill", "none").attr("stroke", "blue").attr("d", line);
+
+            // 4. Histogram for Age Distribution
+            const svgHist = d3.select("#histogramChart")
+                .append("svg")
+                .attr("width", width + 2 * margin)
+                .attr("height", height + 2 * margin)
+                .append("g")
+                .attr("transform", `translate(${margin}, ${margin})`);
+
+            const xHist = d3.scaleLinear().domain([d3.min(data, d => d.age), d3.max(data, d => d.age)]).range([0, width]);
+            svgHist.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xHist));
+
+            const histogram = d3.histogram().value(d => d.age).domain(xHist.domain()).thresholds(xHist.ticks(20));
+            const bins = histogram(data);
+
+            const yHist = d3.scaleLinear().domain([0, d3.max(bins, d => d.length)]).range([height, 0]);
+            svgHist.append("g").call(d3.axisLeft(yHist));
+
+            svgHist.selectAll("rect")
+                .data(bins)
+                .enter()
+                .append("rect")
+                .attr("x", d => xHist(d.x0))
+                .attr("y", d => yHist(d.length))
+                .attr("width", d => xHist(d.x1) - xHist(d.x0) - 1)
+                .attr("height", d => height - yHist(d.length))
+                .attr("fill", "steelblue");
+
+            // 5. Scatter Plot for Balance vs Age
+            const svgScatter = d3.select("#scatterChart")
+                .append("svg")
+                .attr("width", width + 2 * margin)
+                .attr("height", height + 2 * margin)
+                .append("g")
+                .attr("transform", `translate(${margin}, ${margin})`);
+
+            const xScatter = d3.scaleLinear().domain([d3.min(data, d => d.age), d3.max(data, d => d.age)]).range([0, width]);
+            const yScatter = d3.scaleLinear().domain([d3.min(data, d => d.balance), d3.max(data, d => d.balance)]).range([height, 0]);
+
+            svgScatter.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScatter));
+            svgScatter.append("g").call(d3.axisLeft(yScatter));
+
+            svgScatter.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", d => xScatter(d.age))
+                .attr("cy", d => yScatter(d.balance))
+                .attr("r", 3)
+                .attr("fill", "orange");
+
+            // 6. Box and Whisker Plot for Balance by Marital Status
+            const svgBox = d3.select("#boxPlotChart")
+                .append("svg")
+                .attr("width", width + 2 * margin)
+                .attr("height", height + 2 * margin)
+                .append("g")
+                .attr("transform", `translate(${margin}, ${margin})`);
+
+            const groupedData = d3.group(data, d => d.marital);
+            const maritalStatuses = Array.from(groupedData.keys());
+
+            const xBox = d3.scaleBand().domain(maritalStatuses).range([0, width]).padding(0.2);
+            const yBox = d3.scaleLinear().domain([d3.min(data, d => d.balance), d3.max(data, d => d.balance)]).range([height, 0]);
+
+            svgBox.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xBox));
+            svgBox.append("g").call(d3.axisLeft(yBox));
+
+            maritalStatuses.forEach(status => {
+                const balances = groupedData.get(status).map(d => d.balance).sort(d3.ascending);
+                const q1 = d3.quantile(balances, 0.25);
+                const median = d3.quantile(balances, 0.5);
+                const q3 = d3.quantile(balances, 0.75);
+                const iqr = q3 - q1;
+                const lower = Math.max(d3.min(balances), q1 - 1.5 * iqr);
+                const upper = Math.min(d3.max(balances), q3 + 1.5 * iqr);
+                const xCenter = xBox(status) + xBox.bandwidth() / 2;
+
+                svgBox.append("line").attr("x1", xCenter).attr("x2", xCenter).attr("y1", yBox(lower)).attr("y2", yBox(upper)).attr("stroke", "black");
+                svgBox.append("rect").attr("x", xBox(status)).attr("y", yBox(q3)).attr("width", xBox.bandwidth()).attr("height", yBox(q1) - yBox(q3)).attr("fill", "#6b486b");
+                svgBox.append("line").attr("x1", xBox(status)).attr("x2", xBox(status) + xBox.bandwidth()).attr("y1", yBox(median)).attr("y2", yBox(median)).attr("stroke", "white");
+            });
+        });
+    </script>
+</body>
+</html>
